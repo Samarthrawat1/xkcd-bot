@@ -7,6 +7,10 @@ from xkcd_handler import XKCDHandler
 from response_formatter import ResponseFormatter
 
 def run_bot():
+    """
+    Main bot function that handles Reddit interaction and XKCD comic responses.
+    Monitors specified subreddits for '!xkcd' commands and responds with comic information.
+    """
     print("\n=== XKCD Bot Starting Up ===\n")
    
     load_dotenv()
@@ -22,69 +26,56 @@ def run_bot():
     
     xkcd_handler = XKCDHandler()
     response_formatter = ResponseFormatter()
-    
-    # Regular expression to match !xkcd [number] pattern
     xkcd_pattern = re.compile(r'!xkcd\s*(\d*)')
     
     print(f"🤖 Bot started, logged in as u/{reddit.user.me().name}")
-    print("👀 Monitoring comments for '!xkcd' commands...")
     
-    # Track processed comments to avoid duplicates
+    # Get subreddits from environment
+    subreddits = os.getenv('SUBREDDITS', 'test').strip().split(',')
+    
+    # Join subreddits with '+' for multi-subreddit monitoring
+    # Example: 'test+programming+python'
+    subreddit_names = '+'.join(subreddits)
+    print(f"👀 Monitoring subreddits: r/{subreddit_names}")
+    
     processed_comments = set()
-    # TODO 
-    
+    # TODO: database integration
     while True:
         try:
-            # Monitor comments in specified subreddits
-            subreddit = reddit.subreddit('test')  # Add more subreddits with '+': 'test+python+etc'
-            print(f"📡 Watching subreddit: r/{subreddit}")
+            subreddit = reddit.subreddit(subreddit_names)
             
             for comment in subreddit.stream.comments(skip_existing=True):
-                print(f"💭 New comment detected: {comment.id}")
-                
-                # Skip if we've already processed this comment
                 if comment.id in processed_comments:
-                    print(f"⏭️ Skipping already processed comment: {comment.id}")
                     continue
                 
-                # Look for !xkcd command in comment
                 match = xkcd_pattern.search(comment.body.lower())
                 if match:
                     comic_number_str = match.group(1)
-                    print(f"🎯 Found !xkcd command in comment {comment.id}")
+                    print(f"🎯 Found !xkcd command in r/{comment.subreddit.display_name}")
                     
-                    # Validate comic number if provided
                     comic_number = None
                     if comic_number_str:
                         comic_number = xkcd_handler.validate_comic_number(comic_number_str)
                         if comic_number is None:
+                            # If number is invalid (e.g., negative, non-numeric),
+                            # respond with an error and skip to next comment
                             response = response_formatter.format_error_response("invalid_number")
                             comment.reply(response)
                             processed_comments.add(comment.id)
                             continue
                     
-                    print(f"🔢 Requesting comic number: {comic_number if comic_number else 'latest'}")
-                    
-                    # Fetch comic data
+                    # Fetch and respond with comic data
+                    # comic_number=None will fetch the latest comic
                     comic_data = xkcd_handler.get_comic(comic_number)
-                    
-                    # Format and send response
                     response = response_formatter.format_comic_response(comic_data)
                     comment.reply(response)
-                    print(f"✅ Successfully replied to comment {comment.id} with XKCD #{comic_data['num'] if comic_data else 'unknown'}")
                     
-                    # Add to processed comments
                     processed_comments.add(comment.id)
-                    print(f"💾 Added comment {comment.id} to processed comments")
-                    
-                    # Sleep to avoid rate limits
-                    print("⏳ Waiting 2 seconds before next action...")
-                    time.sleep(2)
+                    time.sleep(2)  # Reddit API rate limiting
         
         except Exception as e:
-            print(f"❌ An error occurred: {e}")
-            print("⏳ Waiting 60 seconds before retrying...")
-            time.sleep(60)  # Wait a minute before retrying
+            print(f"❌ Error: {e}")
+            time.sleep(60)  # Wait 1 minute before retrying
 
 if __name__ == "__main__":
     run_bot() 
