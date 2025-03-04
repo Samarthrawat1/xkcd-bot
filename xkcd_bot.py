@@ -34,7 +34,7 @@ def create_comment_response(comic_data):
 
 Direct image link: {comic_data['img']}
 
-^(I am a bot | [Source](https://github.com/your-username/xkcd-bot))"""
+^(I am a bot | [Source](https://github.com/samarthrawat1/xkcd-bot))"""
 
 def run_bot():
     print("\n=== XKCD Bot Starting Up ===\n")
@@ -49,7 +49,7 @@ def run_bot():
         client_secret=os.getenv('REDDIT_CLIENT_SECRET'),
         username=os.getenv('REDDIT_USERNAME'),
         password=os.getenv('REDDIT_PASSWORD'),
-        user_agent='xkcd_bot by /u/samarthrawat1'
+        user_agent=os.getenv('REDDIT_USER_AGENT', 'XKCD_Bot/1.0 by u/samarthrawat1')
     )
     
     # Regular expression to match !xkcd [number] pattern
