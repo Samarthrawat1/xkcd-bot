@@ -68,12 +68,23 @@ def run_bot():
                     comic_data = xkcd_handler.get_comic(comic_number)
                     
                     if comic_data:
+                        logger.debug(f"Comic data received: {comic_data}")
                         logger.info(f"Responding with XKCD #{comic_data['num']}: {comic_data['title']}")
+                        
+                        logger.debug("Formatting response...")
                         response = response_formatter.format_comic_response(comic_data)
+                        logger.debug(f"Formatted response: {response}")
+                        
+                        logger.debug(f"Attempting to reply to comment {comment.id}...")
                         comment.reply(response)
+                        logger.debug("Reply posted successfully")
+                        
+                        logger.debug(f"Adding comment {comment.id} to processed set")
                         processed_comments.add(comment.id)
+                        
                         logger.debug("Waiting for rate limit...")
                         time.sleep(2)  # Reddit API rate limiting
+                        logger.debug("Rate limit wait complete")
                     else:
                         logger.error("Failed to fetch comic data")
         
@@ -81,6 +92,7 @@ def run_bot():
             logger.error(f"An error occurred: {str(e)}")
             logger.info("Waiting 60 seconds before retrying...")
             time.sleep(60)
+            continue
 
 if __name__ == "__main__":
     run_bot() 
