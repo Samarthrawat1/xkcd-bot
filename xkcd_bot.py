@@ -1,49 +1,17 @@
 import praw
-import requests
 import os
 from dotenv import load_dotenv
 import re
 import time
-
-def get_xkcd_comic(comic_number=None):
-    """Fetch XKCD comic data from the API"""
-    if comic_number:
-        url = f'https://xkcd.com/{comic_number}/info.0.json'
-    else:
-        url = 'https://xkcd.com/info.0.json'  # Gets the latest comic
-    
-    print(f"🔍 Fetching XKCD comic from: {url}")
-    try:
-        response = requests.get(url)
-        response.raise_for_status()
-        comic_data = response.json()
-        print(f"✅ Successfully fetched comic #{comic_data['num']}: {comic_data['title']}")
-        return comic_data
-    except requests.RequestException as e:
-        print(f"❌ Error fetching XKCD comic: {e}")
-        return None
-
-def create_comment_response(comic_data):
-    """Create a formatted Reddit comment with the comic information"""
-    if not comic_data:
-        return "Sorry, I couldn't fetch that XKCD comic. Please try again!"
-    
-    return f"""**[{comic_data['title']}](https://xkcd.com/{comic_data['num']})**
-
-{comic_data['alt']}
-
-Direct image link: {comic_data['img']}
-
-^(I am a bot | [Source](https://github.com/samarthrawat1/xkcd-bot))"""
+from xkcd_handler import XKCDHandler
+from response_formatter import ResponseFormatter
 
 def run_bot():
     print("\n=== XKCD Bot Starting Up ===\n")
-    
-    # Load environment variables
+   
     load_dotenv()
     print("📁 Loaded environment variables")
     
-    # Initialize Reddit instance
     reddit = praw.Reddit(
         client_id=os.getenv('REDDIT_CLIENT_ID'),
         client_secret=os.getenv('REDDIT_CLIENT_SECRET'),
@@ -51,6 +19,9 @@ def run_bot():
         password=os.getenv('REDDIT_PASSWORD'),
         user_agent=os.getenv('REDDIT_USER_AGENT', 'XKCD_Bot/1.0 by u/samarthrawat1')
     )
+    
+    xkcd_handler = XKCDHandler()
+    response_formatter = ResponseFormatter()
     
     # Regular expression to match !xkcd [number] pattern
     xkcd_pattern = re.compile(r'!xkcd\s*(\d*)')
@@ -60,6 +31,7 @@ def run_bot():
     
     # Track processed comments to avoid duplicates
     processed_comments = set()
+    # TODO 
     
     while True:
         try:
@@ -78,18 +50,26 @@ def run_bot():
                 # Look for !xkcd command in comment
                 match = xkcd_pattern.search(comment.body.lower())
                 if match:
-                    comic_number = match.group(1)
+                    comic_number_str = match.group(1)
                     print(f"🎯 Found !xkcd command in comment {comment.id}")
-                    print(f"🔢 Requested comic number: {comic_number if comic_number else 'latest'}")
                     
-                    # If no number specified, get the latest comic
-                    if not comic_number:
-                        comic_data = get_xkcd_comic()
-                    else:
-                        comic_data = get_xkcd_comic(comic_number)
+                    # Validate comic number if provided
+                    comic_number = None
+                    if comic_number_str:
+                        comic_number = xkcd_handler.validate_comic_number(comic_number_str)
+                        if comic_number is None:
+                            response = response_formatter.format_error_response("invalid_number")
+                            comment.reply(response)
+                            processed_comments.add(comment.id)
+                            continue
                     
-                    # Reply to the comment
-                    response = create_comment_response(comic_data)
+                    print(f"🔢 Requesting comic number: {comic_number if comic_number else 'latest'}")
+                    
+                    # Fetch comic data
+                    comic_data = xkcd_handler.get_comic(comic_number)
+                    
+                    # Format and send response
+                    response = response_formatter.format_comic_response(comic_data)
                     comment.reply(response)
                     print(f"✅ Successfully replied to comment {comment.id} with XKCD #{comic_data['num'] if comic_data else 'unknown'}")
                     
