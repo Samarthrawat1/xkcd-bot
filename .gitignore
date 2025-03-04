@@ -41,3 +41,5 @@ bot_stats.db
 
 # Poetry
 poetry.lock
+*.lock
+*.log
